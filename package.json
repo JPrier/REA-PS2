@@ -1,0 +1,14 @@
+{
+  "name": "rea-ps2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.19.0" },
+  "bin": { "rea-ps2": "apps/cli/src/main.js" },
+  "scripts": {
+    "test": "node --test tests/unit/*.test.js",
+    "doctor": "node apps/cli/src/main.js doctor --json",
+    "check": "node --check apps/cli/src/main.js && node --test tests/unit/*.test.js",
+    "verify:upstream": "node tooling/verify-upstream-smoke.js"
+  }
+}

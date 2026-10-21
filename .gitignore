@@ -1,0 +1,10 @@
+node_modules/
+.upstream/
+.rea-ps2/
+workspace/
+*.iso
+*.elf
+*.gpr
+*.rep/
+.rea-ps2-minimal.*
+output/

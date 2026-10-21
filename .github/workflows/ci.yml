@@ -1,0 +1,171 @@
+name: REA-PS2 CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit tests and CLI smoke
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.11.0
+      - run: npm test
+      - run: node apps/cli/src/main.js doctor --json
+      - run: node --check apps/cli/src/main.js
+
+  real_upstream_tools:
+    name: Pinned PS2Recomp analysis and translation
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ran-j/PS2Recomp
+          ref: eb8688b2fd191129f103a39543002c005b33409c
+          path: .upstream/ps2recomp
+      - uses: actions/checkout@v4
+        with:
+          repository: serge1/ELFIO
+          ref: 8ae6cec5d60495822ecd57d736f66149da9b1830
+          path: .upstream/dependencies/elfio
+      - uses: actions/checkout@v4
+        with:
+          repository: ToruNiina/toml11
+          ref: be08ba2be2a964edcdb3d3e3ea8d100abc26f286
+          path: .upstream/dependencies/toml11
+      - uses: actions/checkout@v4
+        with:
+          repository: fmtlib/fmt
+          ref: 407c905e45ad75fc29bf0f9bb7c5c2fd3475976f
+          path: .upstream/dependencies/fmt
+      - uses: actions/checkout@v4
+        with:
+          repository: davea42/libdwarf-code
+          ref: 2e088b983562860f497b4fd789a3e61524eb857c
+          path: .upstream/dependencies/libdwarf
+      - uses: actions/checkout@v4
+        with:
+          repository: Decompollaborate/rabbitizer
+          ref: d5804fa488474830a47fbf9f3693048ec1e45589
+          path: .upstream/dependencies/rabbitizer
+      - uses: actions/checkout@v4
+        with:
+          repository: nlohmann/json
+          ref: 9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03
+          path: .upstream/dependencies/nlohmann-json
+      - uses: actions/checkout@v4
+        with:
+          repository: raysan5/raylib
+          ref: c1ab645ca298a2801097931d1079b10ff7eb9df8
+          path: .upstream/dependencies/raylib
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.11.0
+      - name: Configure pinned upstream
+        shell: pwsh
+        run: |
+          $root = (Resolve-Path .).Path
+          cmake -S .upstream/ps2recomp -B .upstream/ps2recomp/build -DPS2X_BUILD_RUNTIME=OFF -DPS2X_BUILD_STUDIO=OFF -DPS2X_BUILD_TEST=OFF -DCMAKE_BUILD_TYPE=Release `
+            "-DFETCHCONTENT_SOURCE_DIR_ELFIO=$root/.upstream/dependencies/elfio" `
+            "-DFETCHCONTENT_SOURCE_DIR_TOML11=$root/.upstream/dependencies/toml11" `
+            "-DFETCHCONTENT_SOURCE_DIR_FMT=$root/.upstream/dependencies/fmt" `
+            "-DFETCHCONTENT_SOURCE_DIR_LIBDWARF=$root/.upstream/dependencies/libdwarf" `
+            "-DFETCHCONTENT_SOURCE_DIR_RABBITIZER=$root/.upstream/dependencies/rabbitizer" `
+            "-DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=$root/.upstream/dependencies/nlohmann-json"
+      - name: Build real analyzer and translator
+        run: cmake --build .upstream/ps2recomp/build --config Release --target ps2_analyzer ps2_recomp --parallel 4
+      - name: Exercise cold and warm analysis, translation, and native linking
+        shell: pwsh
+        run: |
+          $env:REA_PS2_ANALYZER = (Resolve-Path .upstream/ps2recomp/build/ps2xAnalyzer/Release/ps2_analyzer.exe).Path
+          $env:REA_PS2_RECOMP = (Resolve-Path .upstream/ps2recomp/build/ps2xRecomp/Release/ps2_recomp.exe).Path
+          $env:REA_PS2RECOMP_SOURCE = (Resolve-Path .upstream/ps2recomp).Path
+          npm run verify:upstream
+
+  ps2sdk_fixture:
+    name: Build source-owned PS2SDK ELF
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned PS2DEV toolchain
+        run: |
+          curl -fL --retry 3 -o /tmp/ps2dev.tar.gz https://github.com/ps2dev/ps2dev/releases/download/v2.0.0/ps2dev-ubuntu-latest.tar.gz
+          echo "C8E5DEDCCF62084D476894E88CD0451B57F1ED288E741EB3C1263010AAFFC028  /tmp/ps2dev.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/ps2dev"
+          tar -xzf /tmp/ps2dev.tar.gz -C "$RUNNER_TEMP/ps2dev"
+      - name: Build and inspect a real PS2 ELF
+        run: |
+          export PS2DEV="$RUNNER_TEMP/ps2dev/ps2dev"
+          export PS2SDK="$PS2DEV/ps2sdk"
+          export PATH="$PS2DEV/bin:$PS2DEV/ee/bin:$PS2DEV/iop/bin:$PS2DEV/dvp/bin:$PS2SDK/bin:$PATH"
+          bash tooling/build-ps2sdk-smoke.sh "$RUNNER_TEMP/ps2sdk-smoke.elf"
+          file "$RUNNER_TEMP/ps2sdk-smoke.elf"
+          "$PS2DEV/ee/bin/mips64r5900el-ps2-elf-objdump" -f "$RUNNER_TEMP/ps2sdk-smoke.elf"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ps2sdk-smoke-elf
+          path: ${{ runner.temp }}/ps2sdk-smoke.elf
+          if-no-files-found: error
+
+  ghidra_real_import:
+    name: Ghidra EE Reloaded headless import
+    runs-on: windows-2022
+    needs: ps2sdk_fixture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21.0.12+1'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ps2sdk-smoke-elf
+          path: fixture
+      - name: Install pinned Ghidra and EE extension
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .upstream/tools/ghidra, .upstream/tools/extension | Out-Null
+          Invoke-WebRequest https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip -OutFile ghidra.zip
+          if ((Get-FileHash ghidra.zip -Algorithm SHA256).Hash -ne 'DDAC49F903DA9D5BAC833E5CC79395098B9C33CFD3279BE5F31BD00387D2D4DB') { throw 'Ghidra archive SHA-256 mismatch' }
+          Expand-Archive ghidra.zip .upstream/tools/ghidra
+          Invoke-WebRequest https://github.com/chaoticgd/ghidra-emotionengine-reloaded/releases/download/v2.1.38/ghidra_12.1.4_PUBLIC_20261004_ghidra-emotionengine-reloaded.zip -OutFile extension.zip
+          if ((Get-FileHash extension.zip -Algorithm SHA256).Hash -ne 'E389FF3E921D9F7D4DB2ECE9906F808545CE4FF519D9E25A019B72EA509F240B') { throw 'Ghidra EE extension archive SHA-256 mismatch' }
+          Expand-Archive extension.zip .upstream/tools/extension
+          $ghidraRoot = (Resolve-Path .upstream/tools/ghidra/ghidra_12.1.4_PUBLIC).Path
+          Copy-Item -Recurse .upstream/tools/extension/ghidra-emotionengine-reloaded "$ghidraRoot/Ghidra/Extensions/ghidra-emotionengine-reloaded"
+      - name: Import and analyze with the R5900 processor
+        shell: pwsh
+        run: |
+          $ghidraRoot = (Resolve-Path .upstream/tools/ghidra/ghidra_12.1.4_PUBLIC).Path
+          $fixture = (Resolve-Path fixture/ps2sdk-smoke.elf).Path
+          New-Item -ItemType Directory -Force ghidra-project | Out-Null
+          $headless = Join-Path $ghidraRoot 'support/analyzeHeadless.bat'
+          $log = & cmd.exe /d /c "`"$headless`" `"$((Resolve-Path ghidra-project).Path)`" PS2SDKQualification -import `"$fixture`" -processor r5900:LE:32:default -overwrite -analysisTimeoutPerFile 300" 2>&1
+          $log | Write-Output
+          if ($LASTEXITCODE -ne 0 -or ($log -join "`n") -notmatch 'Analysis succeeded for file') { throw 'Ghidra failed to import and analyze the PS2SDK ELF' }
+
+  required:
+    name: REA-PS2 Required
+    if: always()
+    needs: [unit, real_upstream_tools, ps2sdk_fixture, ghidra_real_import]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every current mandatory job
+        env:
+          UNIT_RESULT: ${{ needs.unit.result }}
+          UPSTREAM_RESULT: ${{ needs.real_upstream_tools.result }}
+          PS2SDK_RESULT: ${{ needs.ps2sdk_fixture.result }}
+          GHIDRA_RESULT: ${{ needs.ghidra_real_import.result }}
+        run: |
+          test "$UNIT_RESULT" = success
+          test "$UPSTREAM_RESULT" = success
+          test "$PS2SDK_RESULT" = success
+          test "$GHIDRA_RESULT" = success

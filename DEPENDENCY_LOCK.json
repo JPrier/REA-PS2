@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "upstreams": {
+    "rea": { "repository": "https://github.com/morluto/rea", "revision": "84c89d1107cda017509bc3cd851573d073f9906d", "integration": "external provider; not yet integrated", "license": "MIT" },
+    "ps2recomp": { "repository": "https://github.com/ran-j/PS2Recomp", "revision": "eb8688b2fd191129f103a39543002c005b33409c", "integration": "external translator/runtime; not yet integrated", "license": "GPL-3.0" },
+    "ghidraEmotionEngineReloaded": { "repository": "https://github.com/chaoticgd/ghidra-emotionengine-reloaded", "revision": "fcc5deac45d8f5c27c632bfe0db928630939676e", "integration": "release v2.1.38 installed for Ghidra 12.1.4; headless PS2 ELF import validated; REA adapter not implemented", "license": "Apache-2.0" },
+    "pcsx2": { "repository": "https://github.com/PCSX2/pcsx2", "revision": "fd9d310ccbb6b8b62c976da8886a3c8fd3a10ff3", "integration": "release v2.8.2 installed and process startup validated; PINE launch/reference test blocked pending BIOS", "license": "GNU GPL-3.0-or-later" },
+    "ps2sdk": { "repository": "https://github.com/ps2dev/ps2sdk", "revision": "329e2bb43287e16af16c4dde1c614e2662c24468", "integration": "PS2DEV v2.0.0 fixture toolchain installed and exercised; upstream hello sample has a GCC compatibility issue", "license": "Academic Free License 2.0 at the PS2SDK root; individual components may have additional terms" }
+  },
+  "ps2recompBuildDependencies": {
+    "elfio": { "repository": "https://github.com/serge1/ELFIO", "declaredTag": "Release_3.12", "resolvedRevision": "8ae6cec5d60495822ecd57d736f66149da9b1830" },
+    "toml11": { "repository": "https://github.com/ToruNiina/toml11", "declaredTag": "v4.4.0", "resolvedRevision": "be08ba2be2a964edcdb3d3e3ea8d100abc26f286" },
+    "fmt": { "repository": "https://github.com/fmtlib/fmt", "declaredTag": "12.1.0", "resolvedRevision": "407c905e45ad75fc29bf0f9bb7c5c2fd3475976f" },
+    "libdwarf": { "repository": "https://github.com/davea42/libdwarf-code", "declaredTag": "v2.2.0", "resolvedRevision": "2e088b983562860f497b4fd789a3e61524eb857c" },
+    "rabbitizer": { "repository": "https://github.com/Decompollaborate/rabbitizer", "declaredTag": "1.14.3", "resolvedRevision": "d5804fa488474830a47fbf9f3693048ec1e45589" },
+    "nlohmannJson": { "repository": "https://github.com/nlohmann/json", "declaredTag": "v3.11.3", "resolvedRevision": "9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03" },
+    "raylib": { "repository": "https://github.com/raysan5/raylib", "declaredTag": "5.5", "resolvedRevision": "c1ab645ca298a2801097931d1079b10ff7eb9df8" }
+  },
+  "qualificationTools": {
+    "java": { "distribution": "Eclipse Temurin", "version": "21.0.12+1", "archiveSha256": "F9D6E191AB098C0D416E7D588A24420A8621CD2F4720DAB2459B8B7B2D2D8B4E" },
+    "ghidra": { "version": "12.1.4", "archiveSha256": "DDAC49F903DA9D5BAC833E5CC79395098B9C33CFD3279BE5F31BD00387D2D4DB" },
+    "ghidraEmotionEngineReloaded": { "version": "2.1.38", "archiveSha256": "E389FF3E921D9F7D4DB2ECE9906F808545CE4FF519D9E25A019B72EA509F240B" },
+    "pcsx2": { "version": "2.8.2", "asset": "windows-x64-Qt", "archiveSha256": "7DFC829CA1994CC1045AC49F05E39B6CF968B72E6A374C40E05C2A2B4AC200B4" },
+    "ps2dev": { "version": "2.0.0", "asset": "ubuntu-latest-x64", "releaseRevision": "b1eb649a3765bf68500cfba9bb62433c526c90a8", "archiveSha256": "C8E5DEDCCF62084D476894E88CD0451B57F1ED288E741EB3C1263010AAFFC028" }
+  },
+  "note": "Source repositories are pinned to immutable revisions and not vendored. Qualification archives are independently pinned by release version and SHA-256; local installs and generated binaries stay ignored."
+}
