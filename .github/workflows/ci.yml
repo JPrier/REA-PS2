@@ -124,7 +124,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21.0.12+1'
+          java-version: '21.0.12+101.0.LTS'
       - uses: actions/download-artifact@v4
         with:
           name: ps2sdk-smoke-elf
